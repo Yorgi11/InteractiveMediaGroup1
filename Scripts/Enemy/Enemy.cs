@@ -20,7 +20,7 @@ public class Enemy : MonoBehaviour
     [SerializeField] private Bullet bullet;
 
     private float currentHp;
-    private float range;
+    private float dist;
     private float maxSpeed;
 
     private Vector2 dir;
@@ -33,6 +33,11 @@ public class Enemy : MonoBehaviour
     private Player player;
     private Manager manager;
 
+    private bool timerRun = false;
+    private float timerMax = 4;
+    private float timerCount;
+    private Vector2 playerLast;
+
     private Rigidbody2D rb;
     void Start()
     {
@@ -43,15 +48,17 @@ public class Enemy : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         currentHp = maxHp;
         maxSpeed = speed;
+
+        timerCount = timerMax;
     }
     void Update()
     {
         // direction from the enemy to the player
         dir = (player.transform.position - transform.position).normalized;
         // distance between the enemy and the player
-        range = Vector2.Distance(player.transform.position, transform.position);
+        dist = Vector2.Distance(player.transform.position, transform.position);
         // if in targetrange follow the player
-        if (range <= targetRange) followPlayer = true;
+        if (dist <= targetRange) followPlayer = true;
         else followPlayer = false;
 
         transform.up = dir;
@@ -60,7 +67,7 @@ public class Enemy : MonoBehaviour
         {
             // if in attack range attack the player
             // ranged enemy only
-            if (range <= attackRange) attackPlayer = true;
+            if (dist <= attackRange) attackPlayer = true;
             else attackPlayer = false;
         }
         move.SpeedLimitXY(speed, rb);
@@ -68,8 +75,31 @@ public class Enemy : MonoBehaviour
     private void FixedUpdate()
     {
         // if in range follow the player
-        if (followPlayer) move.MoveXYVelocity(transform.up.x, transform.up.y, speed, rb);
-        else move.Stop2D(rb);
+        if (followPlayer)
+        {
+            move.MoveXYVelocity(transform.up.x, transform.up.y, speed, rb);
+            timerRun = false;
+            timerCount = timerMax;
+        }
+        else if(dist > targetRange && dist <= (targetRange + 2.5) && timerCount == timerMax)
+        {
+            //runs upon player leaving follow range, resets when player next enters follow
+            playerLast = transform.up; //save where the player last was
+            timerRun = true;
+        }
+        if(!followPlayer && !timerRun) move.Stop2D(rb);
+
+        if (timerRun)
+        {
+            speed = maxSpeed * 0.9f;
+            Vector2.MoveTowards(transform.position, playerLast, speed); //move to the player last position
+            timerCount -= Time.smoothDeltaTime;
+            if (timerCount <= 0)
+            {
+                timerRun = false;
+                speed = maxSpeed;
+            }
+        }
 
         // if attacking half the speed
         if (attackPlayer)
